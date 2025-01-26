@@ -4,7 +4,7 @@ import { PriceChart } from './price-chart';
 import { supabase } from '@/lib/supabase';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import type { Item } from '@/lib/supabase';
-import { differenceInDays, subDays, subMonths, subYears } from 'date-fns';
+import { compareAsc, parseISO, subDays } from 'date-fns';
 
 interface ItemGridProps {
   items: Item[];
@@ -16,28 +16,39 @@ interface PriceChange {
 }
 
 function calculatePriceChange(prices: any[], daysAgo: number): PriceChange | null {
-  if (!prices || prices.length === 0) return null;
+  if (!prices || prices.length < 2) return null;
 
-  const today = new Date();
-  const compareDate = subDays(today, daysAgo);
+  // Sort prices by date in ascending order
+  const sortedPrices = [...prices].sort((a, b) => 
+    compareAsc(parseISO(a.date), parseISO(b.date))
+  );
 
-  const currentPrice = Number(prices[prices.length - 1].price);
+  const latestDate = parseISO(sortedPrices[sortedPrices.length - 1].date);
+  const compareDate = subDays(latestDate, daysAgo);
+
+  // Get the latest price
+  const currentPrice = Number(sortedPrices[sortedPrices.length - 1].price);
 
   // Find the closest price to our compare date
-  let oldPrice = currentPrice;
-  for (let i = prices.length - 1; i >= 0; i--) {
-    const priceDate = new Date(prices[i].date);
-    if (priceDate <= compareDate) {
-      oldPrice = Number(prices[i].price);
+  let oldestPriceInPeriod = null;
+  for (let i = 0; i < sortedPrices.length; i++) {
+    const priceDate = parseISO(sortedPrices[i].date);
+    if (priceDate >= compareDate) {
+      oldestPriceInPeriod = Number(sortedPrices[i].price);
       break;
     }
   }
 
-  if (oldPrice === 0) return null;
+  // If we don't have an old enough price, try to use the oldest available
+  if (!oldestPriceInPeriod) {
+    oldestPriceInPeriod = Number(sortedPrices[0].price);
+  }
 
-  const change = ((currentPrice - oldPrice) / oldPrice) * 100;
+  if (!oldestPriceInPeriod || oldestPriceInPeriod === 0) return null;
+
+  const change = ((currentPrice - oldestPriceInPeriod) / oldestPriceInPeriod) * 100;
   return {
-    percentage: Math.abs(change),
+    percentage: Math.abs(Math.round(change * 10) / 10), // Round to 1 decimal place
     increased: change > 0
   };
 }
@@ -49,7 +60,7 @@ function PriceChangeIndicator({ change }: { change: PriceChange | null }) {
   const color = change.increased ? 'text-green-500' : 'text-red-500';
 
   return (
-    <span className={`inline-flex items-center ${color} text-sm`}>
+    <span className={`inline-flex items-center ${color} text-xs font-medium`}>
       <Arrow className="h-3 w-3" />
       {change.percentage.toFixed(1)}%
     </span>
@@ -96,7 +107,7 @@ export function ItemGrid({ items }: ItemGridProps) {
                       Y: <PriceChangeIndicator change={yearChange} />
                     </span>
                   </div>
-                  <span className="text-primary text-lg">${Number(latestPrice).toFixed(2)}</span>
+                  <span className="text-primary text-lg font-medium">${Number(latestPrice).toFixed(2)}</span>
                 </div>
               </CardTitle>
             </CardHeader>
