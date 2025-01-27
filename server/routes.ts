@@ -1,6 +1,29 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { supabase } from "./supabase";
+
+// Middleware for API authentication
+function authenticateApiKey(req: Request, res: Response, next: NextFunction) {
+  const apiKey = req.header("Authorization");
+
+  if (!apiKey) {
+    return res.status(401).json({ error: "Missing API key" });
+  }
+
+  const expectedApiKey = "ThisIsMyPassword1!";
+
+  if (!expectedApiKey) {
+    console.error("AUTH_KEY is not set in environment variables.");
+    return res.status(500).json({ error: "Server configuration error" });
+  }
+
+  if (apiKey !== expectedApiKey) {
+    return res.status(403).json({ error: "Invalid API key" });
+  }
+
+  // If the API key is valid, proceed to the next middleware or route handler
+  next();
+}
 
 export function registerRoutes(app: Express): Server {
   // Get all tracked items
@@ -18,8 +41,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new price point
-  app.post("/api/prices", async (req, res) => {
+  // Add new price point with authentication
+  app.post("/api/prices", authenticateApiKey, async (req, res) => {
     const { item_id, price, date } = req.body;
     try {
       const { error } = await supabase
@@ -33,7 +56,7 @@ export function registerRoutes(app: Express): Server {
       if (error) throw error;
       res.status(201).json({ message: "Price added successfully" });
     } catch (error) {
-      res.status(500).json({ error: "Failed to add price" });
+      res.status(500).json({ error: "Failed to add price: " + error.message" });
     }
   });
 

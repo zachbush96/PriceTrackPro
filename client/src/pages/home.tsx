@@ -46,10 +46,11 @@ export default function Home() {
       <div className="max-w-7xl mx-auto space-y-8">
         <Card>
           <CardHeader>
-            <CardTitle>Price Tracker</CardTitle>
+            <CardTitle>Trump Price Tracker</CardTitle>
+            Updated every 24 hours by Zach Bush
           </CardHeader>
           <CardContent>
-            <AddPriceForm items={items || []} />
+            {/* <AddPriceForm items={items || []} /> */}
           </CardContent>
         </Card>
 
